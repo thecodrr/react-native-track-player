@@ -1,5 +1,6 @@
 package com.guichaguri.trackplayer.service;
 
+import android.media.audiofx.Equalizer;
 import android.os.Binder;
 import android.os.Bundle;
 import com.facebook.react.bridge.Promise;

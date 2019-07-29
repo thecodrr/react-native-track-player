@@ -1,6 +1,7 @@
 package com.guichaguri.trackplayer.service.player;
 
 import android.content.Context;
+import android.media.audiofx.Equalizer;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import com.facebook.react.bridge.Promise;
@@ -27,7 +28,7 @@ import java.util.List;
 /**
  * @author Guichaguri
  */
-public abstract class ExoPlayback<T extends Player> implements EventListener, MetadataOutput {
+public abstract class ExoPlayback<T extends ExoPlayer> implements EventListener, MetadataOutput {
 
     protected final Context context;
     protected final MusicManager manager;
@@ -47,7 +48,8 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
         this.player = player;
 
         Player.MetadataComponent component = player.getMetadataComponent();
-        if(component != null) component.addMetadataOutput(this);
+        if (component != null)
+            component.addMetadataOutput(this);
     }
 
     public void initialize() {
@@ -66,12 +68,16 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
 
     public abstract void removeUpcomingTracks();
 
+    public abstract void setEqualizerSettings(boolean enabled, Equalizer.Settings settings);
+
+    public abstract Equalizer getEqualizer();
+
     public void updateTrack(int index, Track track) {
         int currentIndex = player.getCurrentWindowIndex();
 
         queue.set(index, track);
 
-        if(currentIndex == index)
+        if (currentIndex == index)
             manager.getMetadata().updateMetadata(track);
     }
 
@@ -81,13 +87,13 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     }
 
     public void skip(String id, Promise promise) {
-        if(id == null || id.isEmpty()) {
+        if (id == null || id.isEmpty()) {
             promise.reject("invalid_id", "The ID can't be null or empty");
             return;
         }
 
-        for(int i = 0; i < queue.size(); i++) {
-            if(id.equals(queue.get(i).id)) {
+        for (int i = 0; i < queue.size(); i++) {
+            if (id.equals(queue.get(i).id)) {
                 lastKnownWindow = player.getCurrentWindowIndex();
                 lastKnownPosition = player.getCurrentPosition();
 
@@ -103,7 +109,7 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     public void skipToPrevious(Promise promise) {
         int prev = player.getPreviousWindowIndex();
 
-        if(prev == C.INDEX_UNSET) {
+        if (prev == C.INDEX_UNSET) {
             promise.reject("no_previous_track", "There is no previous track");
             return;
         }
@@ -118,7 +124,7 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     public void skipToNext(Promise promise) {
         int next = player.getNextWindowIndex();
 
-        if(next == C.INDEX_UNSET) {
+        if (next == C.INDEX_UNSET) {
             promise.reject("queue_exhausted", "There is no tracks left to play");
             return;
         }
@@ -144,7 +150,7 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
 
         player.stop(false);
         player.setPlayWhenReady(false);
-        player.seekTo(lastKnownWindow,0);
+        player.seekTo(0, 0);
     }
 
     public void reset() {
@@ -212,15 +218,16 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     }
 
     public int getState() {
-        switch(player.getPlaybackState()) {
-            case Player.STATE_BUFFERING:
-                return player.getPlayWhenReady() ? PlaybackStateCompat.STATE_BUFFERING : PlaybackStateCompat.STATE_CONNECTING;
-            case Player.STATE_ENDED:
-                return PlaybackStateCompat.STATE_STOPPED;
-            case Player.STATE_IDLE:
-                return PlaybackStateCompat.STATE_NONE;
-            case Player.STATE_READY:
-                return player.getPlayWhenReady() ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
+        switch (player.getPlaybackState()) {
+        case Player.STATE_BUFFERING:
+            return player.getPlayWhenReady() ? PlaybackStateCompat.STATE_BUFFERING
+                    : PlaybackStateCompat.STATE_CONNECTING;
+        case Player.STATE_ENDED:
+            return PlaybackStateCompat.STATE_STOPPED;
+        case Player.STATE_IDLE:
+            return PlaybackStateCompat.STATE_NONE;
+        case Player.STATE_READY:
+            return player.getPlayWhenReady() ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED;
         }
         return PlaybackStateCompat.STATE_NONE;
     }
@@ -233,7 +240,8 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
         Log.d(Utils.LOG, "onTimelineChanged: " + reason);
 
-        if((reason == Player.TIMELINE_CHANGE_REASON_PREPARED || reason == Player.TIMELINE_CHANGE_REASON_DYNAMIC) && !timeline.isEmpty()) {
+        if ((reason == Player.TIMELINE_CHANGE_REASON_PREPARED || reason == Player.TIMELINE_CHANGE_REASON_DYNAMIC)
+                && !timeline.isEmpty()) {
             onPositionDiscontinuity(Player.DISCONTINUITY_REASON_INTERNAL);
         }
     }
@@ -242,16 +250,18 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     public void onPositionDiscontinuity(int reason) {
         Log.d(Utils.LOG, "onPositionDiscontinuity: " + reason);
 
-        if(lastKnownWindow != player.getCurrentWindowIndex()) {
+        if (lastKnownWindow != player.getCurrentWindowIndex()) {
             Track previous = lastKnownWindow == C.INDEX_UNSET ? null : queue.get(lastKnownWindow);
             Track next = getCurrentTrack();
 
             // Track changed because it ended
             // We'll use its duration instead of the last known position
             if (reason == Player.DISCONTINUITY_REASON_PERIOD_TRANSITION && lastKnownWindow != C.INDEX_UNSET) {
-                if (lastKnownWindow >= player.getCurrentTimeline().getWindowCount()) return;
+                if (lastKnownWindow >= player.getCurrentTimeline().getWindowCount())
+                    return;
                 long duration = player.getCurrentTimeline().getWindow(lastKnownWindow, new Window()).getDurationMs();
-                if(duration != C.TIME_UNSET) lastKnownPosition = duration;
+                if (duration != C.TIME_UNSET)
+                    lastKnownPosition = duration;
             }
 
             manager.onTrackUpdate(previous, lastKnownPosition, next);
@@ -263,12 +273,12 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
 
     @Override
     public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-        for(int i = 0; i < trackGroups.length; i++) {
+        for (int i = 0; i < trackGroups.length; i++) {
             // Loop through all track groups.
             // As for the current implementation, there should be only one
             TrackGroup group = trackGroups.get(i);
 
-            for(int f = 0; f < group.length; f++) {
+            for (int f = 0; f < group.length; f++) {
                 // Loop through all formats inside the track group
                 Format format = group.getFormat(f);
 
@@ -289,19 +299,19 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
         int state = getState();
 
-        if(state != previousState) {
-            if(Utils.isPlaying(state) && !Utils.isPlaying(previousState)) {
+        if (state != previousState) {
+            if (Utils.isPlaying(state) && !Utils.isPlaying(previousState)) {
                 manager.onPlay();
-            } else if(Utils.isPaused(state) && !Utils.isPaused(previousState)) {
+            } else if (Utils.isPaused(state) && !Utils.isPaused(previousState)) {
                 manager.onPause();
-            } else if(Utils.isStopped(state) && !Utils.isStopped(previousState)) {
+            } else if (Utils.isStopped(state) && !Utils.isStopped(previousState)) {
                 manager.onStop();
             }
 
             manager.onStateChange(state);
             previousState = state;
 
-            if(state == PlaybackStateCompat.STATE_STOPPED) {
+            if (state == PlaybackStateCompat.STATE_STOPPED) {
                 manager.onEnd(getCurrentTrack(), getPosition());
             }
         }
@@ -321,9 +331,9 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     public void onPlayerError(ExoPlaybackException error) {
         String code;
 
-        if(error.type == ExoPlaybackException.TYPE_SOURCE) {
+        if (error.type == ExoPlaybackException.TYPE_SOURCE) {
             code = "playback-source";
-        } else if(error.type == ExoPlaybackException.TYPE_RENDERER) {
+        } else if (error.type == ExoPlaybackException.TYPE_RENDERER) {
             code = "playback-renderer";
         } else {
             code = "playback"; // Other unexpected errors related to the playback
@@ -345,7 +355,7 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
     private void handleId3Metadata(Metadata metadata) {
         String title = null, url = null, artist = null, album = null, date = null, genre = null;
 
-        for(int i = 0; i < metadata.length(); i++) {
+        for (int i = 0; i < metadata.length(); i++) {
             Metadata.Entry entry = metadata.get(i);
 
             if (entry instanceof TextInformationFrame) {
@@ -386,15 +396,15 @@ public abstract class ExoPlayback<T extends Player> implements EventListener, Me
         for (int i = 0; i < metadata.length(); i++) {
             Metadata.Entry entry = metadata.get(i);
 
-            if(entry instanceof IcyHeaders) {
+            if (entry instanceof IcyHeaders) {
                 // ICY headers
-                IcyHeaders icy = (IcyHeaders)entry;
+                IcyHeaders icy = (IcyHeaders) entry;
 
                 manager.onMetadataReceived("icy-headers", icy.name, icy.url, null, null, null, icy.genre);
 
-            } else if(entry instanceof IcyInfo) {
+            } else if (entry instanceof IcyInfo) {
                 // ICY data
-                IcyInfo icy = (IcyInfo)entry;
+                IcyInfo icy = (IcyInfo) entry;
 
                 String artist, title;
                 int index = icy.title == null ? -1 : icy.title.indexOf(" - ");
