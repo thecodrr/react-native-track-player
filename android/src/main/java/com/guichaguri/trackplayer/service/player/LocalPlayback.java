@@ -216,7 +216,6 @@ public class LocalPlayback extends ExoPlayback<EqualizedExoPlayer> {
     @Override
     public void destroy() {
         super.destroy();
-
         if (cache != null) {
             try {
                 cache.release();

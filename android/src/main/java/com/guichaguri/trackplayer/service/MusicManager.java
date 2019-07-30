@@ -115,6 +115,7 @@ public class MusicManager implements OnAudioFocusChangeListener {
     }
 
     public LocalPlayback createLocalPlayback(Bundle options) {
+        Log.d(Utils.LOG, "createLocalPlayback");
         int minBuffer = (int) Utils.toMillis(options.getDouble("minBuffer", Utils.toSeconds(DEFAULT_MIN_BUFFER_MS)));
         int maxBuffer = (int) Utils.toMillis(options.getDouble("maxBuffer", Utils.toSeconds(DEFAULT_MAX_BUFFER_MS)));
         int playBuffer = (int) Utils
@@ -360,6 +361,7 @@ public class MusicManager implements OnAudioFocusChangeListener {
         // Release the playback resources
         if (playback != null)
             playback.destroy();
+        playback = null;
 
         // Release the metadata resources
         metadata.destroy();

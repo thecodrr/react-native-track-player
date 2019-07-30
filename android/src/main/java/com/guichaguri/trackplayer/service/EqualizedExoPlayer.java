@@ -6,6 +6,7 @@ import android.media.audiofx.AudioEffect;
 import android.media.audiofx.Equalizer;
 import android.os.Bundle;
 import android.os.Looper;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
@@ -40,18 +41,22 @@ public class EqualizedExoPlayer implements ExoPlayer {
         mExoPlayer = delegate;
         mExoPlayer.setAudioDebugListener(new EqualizerEventListener());
     }
-    private void onAudioSessionId(int sessionId){
+
+    private void onAudioSessionId(int sessionId) {
         Bundle bundle = new Bundle();
         bundle.putInt("sessionId", sessionId);
-        MusicService service = (MusicService)mContext;
+        MusicService service = (MusicService) mContext;
         service.emit("audio-session-id", bundle);
     }
-    public Equalizer getEqualizer(){
-        if(mEqualizer == null) {
+
+    public Equalizer getEqualizer() {
+        if (mEqualizer == null) {
+            Log.i("EQExoPlayer", "Initializing equalizer...");
             updateEqualizerPrefs(true, true);
         }
         return mEqualizer;
     }
+
     public void setEqualizerSettings(boolean enabled, Equalizer.Settings settings) {
         boolean invalidate = mEqualizerEnabled != enabled || mEqualizerEnabled;
         boolean wasSystem = isUsingSystemEqualizer();
@@ -65,7 +70,9 @@ public class EqualizedExoPlayer implements ExoPlayer {
     }
 
     private void updateEqualizerPrefs(boolean useCustom, boolean wasSystem) {
+        Log.i("EQExoPlayer", "Updating equalizer prefs...");
         int audioSessionId = mExoPlayer.getAudioSessionId();
+        Log.i("EQExoPlayer", "AudioSessionId=" + String.valueOf(audioSessionId));
 
         if (audioSessionId == NO_AUDIO_SESSION_ID) {
             // No equalizer is currently bound. Nothing to do.
@@ -113,7 +120,7 @@ public class EqualizedExoPlayer implements ExoPlayer {
 
     private void bindCustomEqualizer(int audioSessionId) {
         mEqualizer = new Equalizer(0, audioSessionId);
-        if(mEqualizerSettings != null)
+        if (mEqualizerSettings != null)
             mEqualizer.setProperties(mEqualizerSettings);
         mEqualizer.setEnabled(true);
     }
@@ -133,12 +140,17 @@ public class EqualizedExoPlayer implements ExoPlayer {
         mContext.sendBroadcast(intent);
     }
 
-    private void unbindCustomEqualizer() {
+    public void destroy() {
         if (mEqualizer != null) {
+            Log.i("EQExoPlayer", "Destroying equalizer...");
             mEqualizer.setEnabled(false);
             mEqualizer.release();
             mEqualizer = null;
         }
+    }
+
+    private void unbindCustomEqualizer() {
+        destroy();
     }
 
     private class EqualizerEventListener implements AudioRendererEventListener {
@@ -166,7 +178,7 @@ public class EqualizedExoPlayer implements ExoPlayer {
 
         @Override
         public void onAudioDecoderInitialized(String decoderName, long initializedTimestampMs,
-                long initializationDurationMs) {
+                                              long initializationDurationMs) {
         }
 
         @Override
@@ -267,11 +279,13 @@ public class EqualizedExoPlayer implements ExoPlayer {
     @Override
     public void prepare(MediaSource mediaSource) {
         mExoPlayer.prepare(mediaSource);
+        mExoPlayer.setAudioDebugListener(new EqualizerEventListener());
     }
 
     @Override
     public void prepare(MediaSource mediaSource, boolean resetPosition, boolean resetTimeline) {
         mExoPlayer.prepare(mediaSource, resetPosition, resetTimeline);
+        mExoPlayer.setAudioDebugListener(new EqualizerEventListener());
     }
 
     @Override
@@ -291,7 +305,7 @@ public class EqualizedExoPlayer implements ExoPlayer {
 
     @Override
     public void setRepeatMode(int repeatMode) {
-mExoPlayer.setRepeatMode(repeatMode);
+        mExoPlayer.setRepeatMode(repeatMode);
     }
 
     @Override
@@ -301,7 +315,7 @@ mExoPlayer.setRepeatMode(repeatMode);
 
     @Override
     public void setShuffleModeEnabled(boolean shuffleModeEnabled) {
-mExoPlayer.setShuffleModeEnabled(shuffleModeEnabled);
+        mExoPlayer.setShuffleModeEnabled(shuffleModeEnabled);
     }
 
     @Override
@@ -341,7 +355,7 @@ mExoPlayer.setShuffleModeEnabled(shuffleModeEnabled);
 
     @Override
     public void previous() {
-mExoPlayer.previous();
+        mExoPlayer.previous();
     }
 
     @Override
@@ -356,7 +370,7 @@ mExoPlayer.previous();
 
     @Override
     public void setPlaybackParameters(@Nullable PlaybackParameters playbackParameters) {
-mExoPlayer.setPlaybackParameters(playbackParameters);
+        mExoPlayer.setPlaybackParameters(playbackParameters);
     }
 
     @Override
@@ -371,12 +385,14 @@ mExoPlayer.setPlaybackParameters(playbackParameters);
 
     @Override
     public void stop(boolean reset) {
-mExoPlayer.stop();
+        mExoPlayer.stop();
     }
 
     @Override
     public void release() {
         mExoPlayer.release();
+        mExoPlayer = null;
+        destroy();
     }
 
     @Override

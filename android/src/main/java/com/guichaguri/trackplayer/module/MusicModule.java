@@ -258,6 +258,9 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
         waitForConnection(() -> {
             ExoPlayback playback = binder.getPlayback();
             Equalizer mEqualizer = playback.getEqualizer();
+            if (mEqualizer == null) {
+                return;
+            }
             ReadableArray values = eqSettings.getArray("frequencies");
             if (values == null) return;
 
@@ -278,6 +281,10 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
         waitForConnection(() -> {
             ExoPlayback playback = binder.getPlayback();
             Equalizer mEqualizer = playback.getEqualizer();
+            if (mEqualizer == null) {
+                promise.resolve(null);
+                return;
+            }
             short numberFrequencyBands = mEqualizer.getNumberOfBands();
             List<Short> bandLevels = new ArrayList<>();
             for (short i = 0; i < numberFrequencyBands; i++) {
@@ -293,6 +300,9 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
         waitForConnection(() -> {
             ExoPlayback playback = binder.getPlayback();
             Equalizer mEqualizer = playback.getEqualizer();
+            if (mEqualizer == null) {
+                return;
+            }
             mEqualizer.setEnabled(enabled);
         });
     }
@@ -302,6 +312,9 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
         waitForConnection(() ->{
             ExoPlayback playback = binder.getPlayback();
             Equalizer mEqualizer = playback.getEqualizer();
+            if (mEqualizer == null) {
+                return;
+            }
             short bandIndex = (short)bandLevel.getInt("bandIndex");
             int bandValue = bandLevel.getInt("level");
             final short lowerEqualizerBandLevel = mEqualizer.getBandLevelRange()[0];
