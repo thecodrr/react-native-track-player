@@ -324,6 +324,10 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
         waitForConnection(() -> {
             ExoPlayback playback = binder.getPlayback();
             Equalizer mEqualizer = playback.getEqualizer();
+            if (mEqualizer == null) {
+                callback.resolve(null);
+                return;
+            }
             short numberFrequencyBands = mEqualizer.getNumberOfBands();
 
             // get the level ranges to be used in setting the band level

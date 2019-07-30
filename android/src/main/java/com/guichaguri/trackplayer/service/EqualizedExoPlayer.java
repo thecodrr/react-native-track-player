@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.audiofx.AudioEffect;
 import android.media.audiofx.Equalizer;
+import android.os.Bundle;
 import android.os.Looper;
 
 import androidx.annotation.Nullable;
@@ -39,7 +40,16 @@ public class EqualizedExoPlayer implements ExoPlayer {
         mExoPlayer = delegate;
         mExoPlayer.setAudioDebugListener(new EqualizerEventListener());
     }
+    private void onAudioSessionId(int sessionId){
+        Bundle bundle = new Bundle();
+        bundle.putInt("sessionId", sessionId);
+        MusicService service = (MusicService)mContext;
+        service.emit("audio-session-id", bundle);
+    }
     public Equalizer getEqualizer(){
+        if(mEqualizer == null) {
+            updateEqualizerPrefs(true, true);
+        }
         return mEqualizer;
     }
     public void setEqualizerSettings(boolean enabled, Equalizer.Settings settings) {
@@ -82,10 +92,11 @@ public class EqualizedExoPlayer implements ExoPlayer {
     }
 
     private boolean isUsingSystemEqualizer() {
-        return mEqualizerSettings == null || !mEqualizerEnabled;
+        return false; // mEqualizerSettings == null || !mEqualizerEnabled;
     }
 
     private void onBindEqualizer(int newAudioSessionId) {
+        onAudioSessionId(newAudioSessionId);
         if (isUsingSystemEqualizer()) {
             bindSystemEqualizer(newAudioSessionId);
         } else {
@@ -102,7 +113,8 @@ public class EqualizedExoPlayer implements ExoPlayer {
 
     private void bindCustomEqualizer(int audioSessionId) {
         mEqualizer = new Equalizer(0, audioSessionId);
-        mEqualizer.setProperties(mEqualizerSettings);
+        if(mEqualizerSettings != null)
+            mEqualizer.setProperties(mEqualizerSettings);
         mEqualizer.setEnabled(true);
     }
 
