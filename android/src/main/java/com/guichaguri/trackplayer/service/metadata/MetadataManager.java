@@ -3,6 +3,7 @@ package com.guichaguri.trackplayer.service.metadata;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -21,6 +22,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestManager;
 import com.bumptech.glide.request.target.SimpleTarget;
 import com.bumptech.glide.request.transition.Transition;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.views.imagehelper.ResourceDrawableIdHelper;
 import com.guichaguri.trackplayer.R;
 import com.guichaguri.trackplayer.service.MusicManager;
@@ -63,6 +65,12 @@ public class MetadataManager {
         Context context = service.getApplicationContext();
         String packageName = context.getPackageName();
         Intent openApp = context.getPackageManager().getLaunchIntentForPackage(packageName);
+
+        if (openApp == null) {
+            openApp = new Intent();
+            openApp.setPackage(packageName);
+            openApp.addCategory(Intent.CATEGORY_LAUNCHER);
+        }
 
         // Prevent the app from launching a new instance
         openApp.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -190,7 +198,7 @@ public class MetadataManager {
      * 
      * @param track The new track
      */
-    public void updateMetadata(Track track) {
+    public void updateMetadata(ExoPlayback playback, Track track) {
         MediaMetadataCompat.Builder metadata = track.toMediaMetadata();
 
         RequestManager rm = Glide.with(service.getApplicationContext());
@@ -216,12 +224,13 @@ public class MetadataManager {
         builder.setSubText(track.album);
 
         session.setMetadata(metadata.build());
+
+        updatePlaybackState(playback);
         updateNotification();
     }
 
     /**
-     * Updates the playback state
-     * 
+     * Updates the playback state and notification buttons
      * @param playback The player
      */
     public void updatePlayback(ExoPlayback playback) {
@@ -277,14 +286,22 @@ public class MetadataManager {
 
         }
 
+        updatePlaybackState(playback);
+        updateNotification();
+    }
+
+    /**
+     * Updates the playback state
+     * @param playback The player
+     */
+    private void updatePlaybackState(ExoPlayback playback) {
         // Updates the media session state
         PlaybackStateCompat.Builder pb = new PlaybackStateCompat.Builder();
         pb.setActions(actions);
-        pb.setState(state, playback.getPosition(), playback.getRate());
+        pb.setState(playback.getState(), playback.getPosition(), playback.getRate());
         pb.setBufferedPosition(playback.getBufferedPosition());
 
         session.setPlaybackState(pb.build());
-        updateNotification();
     }
 
     public void setActive(boolean active) {

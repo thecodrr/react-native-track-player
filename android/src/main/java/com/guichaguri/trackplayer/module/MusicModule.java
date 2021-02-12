@@ -4,7 +4,6 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
-import android.media.audiofx.Equalizer;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.media.RatingCompat;
@@ -161,6 +160,9 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
 
     @ReactMethod
     public void destroy() {
+        // Ignore if it was already destroyed
+        if (binder == null && !connecting) return;
+
         try {
             if(binder != null) {
                 binder.destroy();
@@ -253,119 +255,6 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
         });
     }
 
-    @ReactMethod
-    public void setEqualizerSettings(ReadableMap eqSettings) {
-        waitForConnection(() -> {
-            ExoPlayback playback = binder.getPlayback();
-            Equalizer mEqualizer = playback.getEqualizer();
-            if (mEqualizer == null) {
-                return;
-            }
-            ReadableArray values = eqSettings.getArray("frequencies");
-            if (values == null) return;
-
-            Equalizer.Settings settings = new Equalizer.Settings();
-            settings.numBands = mEqualizer.getNumberOfBands();
-            short[] array = new short[mEqualizer.getNumberOfBands()];
-            for (short i = 0; i < values.size(); i++) {
-                array[i] = (short) values.getInt(i);
-            }
-            settings.bandLevels = array;
-            settings.curPreset = (short) eqSettings.getInt("currentPreset");
-            playback.setEqualizerSettings(eqSettings.getBoolean("enabled"), settings);
-        });
-    }
-
-    @ReactMethod
-    public void getEQBandLevels(final Promise promise){
-        waitForConnection(() -> {
-            ExoPlayback playback = binder.getPlayback();
-            Equalizer mEqualizer = playback.getEqualizer();
-            if (mEqualizer == null) {
-                promise.resolve(null);
-                return;
-            }
-            short numberFrequencyBands = mEqualizer.getNumberOfBands();
-            List<Short> bandLevels = new ArrayList<>();
-            for (short i = 0; i < numberFrequencyBands; i++) {
-                bandLevels.add(mEqualizer.getBandLevel(i)) ;
-            }
-            WritableArray array = Arguments.fromList(bandLevels);
-            promise.resolve(array);
-        });
-    }
-
-    @ReactMethod
-    public void setEqualizerEnabled(boolean enabled){
-        waitForConnection(() -> {
-            ExoPlayback playback = binder.getPlayback();
-            Equalizer mEqualizer = playback.getEqualizer();
-            if (mEqualizer == null) {
-                return;
-            }
-            mEqualizer.setEnabled(enabled);
-        });
-    }
-
-    @ReactMethod
-    public void setEQBandLevel(ReadableMap bandLevel){
-        waitForConnection(() ->{
-            ExoPlayback playback = binder.getPlayback();
-            Equalizer mEqualizer = playback.getEqualizer();
-            if (mEqualizer == null) {
-                return;
-            }
-            short bandIndex = (short)bandLevel.getInt("bandIndex");
-            int bandValue = bandLevel.getInt("level");
-            final short lowerEqualizerBandLevel = mEqualizer.getBandLevelRange()[0];
-            mEqualizer.setBandLevel(bandIndex,
-                    (short) (bandValue + lowerEqualizerBandLevel));
-        });
-    }
-
-    @ReactMethod
-    public void setEQPreset(int presetIndex){
-        waitForConnection(() ->{
-            ExoPlayback playback = binder.getPlayback();
-            Equalizer mEqualizer = playback.getEqualizer();
-            mEqualizer.usePreset((short)presetIndex);
-        });
-    }
-
-    @ReactMethod
-    public void getEQConfig(final Promise callback) {
-        waitForConnection(() -> {
-            ExoPlayback playback = binder.getPlayback();
-            Equalizer mEqualizer = playback.getEqualizer();
-            if (mEqualizer == null) {
-                callback.resolve(null);
-                return;
-            }
-            short numberFrequencyBands = mEqualizer.getNumberOfBands();
-
-            // get the level ranges to be used in setting the band level
-            // get lower limit of the range in decibels
-            final int lowerEqualizerBandLevel = mEqualizer.getBandLevelRange()[0] / 100;
-            // get the upper limit of the range in decibels
-            final int upperEqualizerBandLevel = mEqualizer.getBandLevelRange()[1] / 100;
-            List<String> frequencyList = new ArrayList<>();
-            for (short i = 0; i < numberFrequencyBands; i++) {
-                String frequency = (mEqualizer.getCenterFreq(i) / 1000) + " Hz";
-                frequencyList.add(frequency);
-            }
-            String[] presets = new String[mEqualizer.getNumberOfPresets()];
-            for (int k = 0; k < mEqualizer.getNumberOfPresets(); k++)
-                presets[k] = mEqualizer.getPresetName((short) k);
-
-            WritableMap map = Arguments.createMap();
-            map.putInt("lowerBandLevel", lowerEqualizerBandLevel);
-            map.putInt("upperBandLevel", upperEqualizerBandLevel);
-            map.putInt("noOfBands", numberFrequencyBands);
-            map.putArray("frequencies", Arguments.fromList(frequencyList));
-            map.putArray("presets", Arguments.fromArray(presets));
-            callback.resolve(map);
-        });
-    }
     @ReactMethod
     public void updateMetadataForTrack(String id, ReadableMap map, final Promise callback) {
         waitForConnection(() -> {
@@ -567,6 +456,10 @@ public class MusicModule extends ReactContextBaseJavaModule implements ServiceCo
 
     @ReactMethod
     public void getState(final Promise callback) {
-        waitForConnection(() -> callback.resolve(binder.getPlayback().getState()));
+        if (binder == null) {
+            callback.resolve(PlaybackStateCompat.STATE_NONE);
+        } else {
+            waitForConnection(() -> callback.resolve(binder.getPlayback().getState()));
+        }
     }
 }

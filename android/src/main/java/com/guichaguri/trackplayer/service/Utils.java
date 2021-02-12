@@ -6,6 +6,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.Resources;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Build;
 import android.support.v4.media.RatingCompat;
@@ -160,12 +161,14 @@ public class Utils {
 
     public static String getNotificationChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(Utils.NOTIFICATION_CHANNEL, "MusicService",
-                    NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationChannel channel = new NotificationChannel(
+                Utils.NOTIFICATION_CHANNEL,
+                "MusicService",
+                NotificationManager.IMPORTANCE_DEFAULT
+            );
             channel.setShowBadge(false);
             channel.setSound(null, null);
-            ((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE))
-                    .createNotificationChannel(channel);
+            ((NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(channel);
         }
         return Utils.NOTIFICATION_CHANNEL;
     }
